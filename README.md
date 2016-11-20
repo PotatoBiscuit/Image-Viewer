@@ -4,6 +4,6 @@ P3/P6 image viewer, that allows for the user to translate, rotate, scale, or she
 
 Compile with: cl /MD /I. *.lib ezview.c
 
-Run: ezview input.ppm
-
 Or just use Makefile
+
+Run: ezview input.ppm
