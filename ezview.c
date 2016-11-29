@@ -11,17 +11,23 @@
 GLFWwindow* window;
 int line = 1;
 
-typedef struct {
-  float position[3];
-  float color[4];
+typedef struct{
+	float position[3];
+	float color[4];
+	float texcoord[2];
 } Vertex;
 
+typedef struct{
+	GLubyte* texture_pixels;
+	double width;
+	double height;
+} Triple;
 
 const Vertex Vertices[] = {
-  {{1, -1, 0}, {1, 0, 0, 1}},
-  {{1, 1, 0}, {0, 1, 0, 1}},
-  {{-1, 1, 0}, {0, 0, 1, 1}},
-  {{-1, -1, 0}, {0, 0, 0, 1}}
+  {{1, -1, 0}, {1, 1, 1, 0}, {0, 0}},
+  {{1, 1, 0}, {1, 1, 1, 0}, {1, 0}},
+  {{-1, 1, 0}, {0, 0, 1, 0}, {1, 1}},
+  {{-1, -1, 0}, {0, 0, 0, 0}, {0, 1}}
 };
 
 
@@ -30,24 +36,29 @@ const GLubyte Indices[] = {
   2, 3, 0
 };
 
-
 char* vertex_shader_src =
   "attribute vec4 Position;\n"
   "attribute vec4 SourceColor;\n"
+  "attribute vec2 TexCoordIn;\n"
+  "varying vec2 TexCoordOut;\n"
   "\n"
   "varying vec4 DestinationColor;\n"
   "\n"
   "void main(void) {\n"
   "    DestinationColor = SourceColor;\n"
   "    gl_Position = Position;\n"
+  "    TexCoordOut = TexCoordIn;\n"
   "}\n";
-
 
 char* fragment_shader_src =
   "varying lowp vec4 DestinationColor;\n"
+  "varying lowp vec2 TexCoordOut;\n"
+  "uniform sampler2D Texture;\n"
+  
   "\n"
   "void main(void) {\n"
-  "    gl_FragColor = DestinationColor;\n"
+  "    //gl_FragColor = DestinationColor;\n"
+  "    gl_FragColor = texture2D(Texture, TexCoordOut);\n"
   "}\n";
 
 
@@ -173,18 +184,21 @@ double next_number(FILE* json) {	//Parse the next number and return it as a doub
 	return value;
 }
 
-GLubyte*** read_p3_file(FILE* ppm){
+Triple* read_p3_file(FILE* ppm){
 	double width, height, alpha;
+	Triple* texture_struct = malloc(sizeof(Triple));
 	int i, j;
-	GLubyte*** texture_pixels;
+	GLubyte* texture_pixels;
 	
 	skip_comts_ws(ppm);
 	width = next_number(ppm);
 	
-	texture_pixels = malloc(sizeof(GLubyte**) * width);
-	
 	skip_comts_ws(ppm);
 	height = next_number(ppm);
+	
+	texture_struct->width = width;
+	texture_struct->height = height;
+	texture_pixels = malloc(sizeof(GLubyte) * width * height * 3);
 	
 	skip_comts_ws(ppm);
 	if((alpha = next_number(ppm)) != 255){
@@ -193,34 +207,36 @@ GLubyte*** read_p3_file(FILE* ppm){
 	}
 	skip_comts_ws(ppm);
 	
-	for(i = 0; i < width; i++){
-		texture_pixels[i] = malloc(sizeof(GLubyte*) * height);
-		for(j = 0; j < height; j++){
-			texture_pixels[i][j] = malloc(sizeof(GLubyte) * 3);
-			texture_pixels[i][j][0] = (int) next_number(ppm);
+	for(i = 0; i < height; i++){
+		for(j = 0; j < width; j++){
+			texture_pixels[(int)(j + height * i) * 3] = (int) next_number(ppm);
 			skip_ws(ppm);
-			texture_pixels[i][j][1] = (int) next_number(ppm);
+			texture_pixels[(int)(j + height * i) * 3 + 1] = (int) next_number(ppm);
 			skip_ws(ppm);
-			texture_pixels[i][j][2] = (int) next_number(ppm);
+			texture_pixels[(int)(j + height * i) * 3 + 2] = (int) next_number(ppm);
 			if(i == width - 1 && j == height - 1) continue;
 			skip_ws(ppm);
 		}
 	}
-	return texture_pixels;
+	texture_struct->texture_pixels = texture_pixels;
+	return texture_struct;
 }
 
-GLubyte*** read_p6_file(FILE* ppm){
+Triple* read_p6_file(FILE* ppm){
 	double width, height, alpha;
+	Triple* texture_struct = malloc(sizeof(Triple));
 	int i, j, c;
-	GLubyte*** texture_pixels;
+	GLubyte* texture_pixels;
 	
 	skip_comts_ws(ppm);
 	width = next_number(ppm);
 	
-	texture_pixels = malloc(sizeof(GLubyte**) * width);
-	
 	skip_comts_ws(ppm);
 	height = next_number(ppm);
+	
+	texture_struct->width = width;
+	texture_struct->height = height;
+	texture_pixels = malloc(sizeof(GLubyte) * width * height * 3);
 	
 	skip_comts_ws(ppm);
 	if((alpha = next_number(ppm)) != 255){
@@ -232,49 +248,50 @@ GLubyte*** read_p6_file(FILE* ppm){
 		exit(1);
 	}
 	
-	for(i = 0; i < width; i++){
-		texture_pixels[i] = malloc(sizeof(GLubyte*) * height);
-		for(j = 0; j < height; j++){
-			texture_pixels[i][j] = malloc(sizeof(GLubyte) * 3);
-			texture_pixels[i][j][0] = next_c(ppm);
-			texture_pixels[i][j][1] = next_c(ppm);
-			texture_pixels[i][j][2] = next_c(ppm);
+	for(i = 0; i < height; i++){
+		for(j = 0; j < width; j++){
+			texture_pixels[(int)(j + height * i) * 3] = next_c(ppm);
+			texture_pixels[(int)(j + height * i) * 3 + 1] = next_c(ppm);
+			texture_pixels[(int)(j + height * i) * 3 + 2] = next_c(ppm);
 		}
 	}
-	return texture_pixels;
+	texture_struct->texture_pixels = texture_pixels;
+	return texture_struct;
 }
 
-GLubyte*** read_ppm_file(char* inputName){
-	GLubyte*** texture_pixels;
+Triple* read_ppm_file(char* inputName){
+	Triple* texture_struct;
 	FILE* inputFile = fopen(inputName, "rb");
 	skip_comts_ws(inputFile);
 	expect_c(inputFile, 'P');
 	int c = next_c(inputFile);
 	if(c == '3'){
-		texture_pixels = read_p3_file(inputFile);
+		texture_struct = read_p3_file(inputFile);
 	}else if(c == '6'){
-		texture_pixels = read_p6_file(inputFile);
+		texture_struct = read_p6_file(inputFile);
 	}else{
 		fprintf(stderr, "Error: Incorrect ppm file number on line %d", line);
 		exit(1);
 	}
 	fclose(inputFile);
-	return texture_pixels;
+	return texture_struct;
 }
 
 int main(int argc, char** argv) {
-	GLubyte*** texture_pixels;
-	texture_pixels = read_ppm_file(argv[1]);
+	Triple* texture_struct;
+	int i, j;
+	texture_struct = read_ppm_file(argv[1]);
 
-	/*GLint program_id, position_slot, color_slot;
+	GLint program_id, position_slot, color_slot, texture_slot;
 	GLuint vertex_buffer;
 	GLuint index_buffer;
+	GLint textureUniform;
 
 	glfwSetErrorCallback(error_callback);
 
 	// Initialize GLFW library
 	if (!glfwInit())
-	return -1;
+		return -1;
 
 	glfwDefaultWindowHints();
 	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
@@ -290,22 +307,47 @@ int main(int argc, char** argv) {
 							NULL);
 
 	if (!window) {
-	glfwTerminate();
-	printf("glfwCreateWindow Error\n");
-	exit(1);
+		glfwTerminate();
+		printf("glfwCreateWindow Error\n");
+		exit(1);
 	}
 
 	glfwMakeContextCurrent(window);
+	
+	//Texture Setup -----------------------------
+	GLuint myTexture;
+	glGenTextures(1, &myTexture);
+	glBindTexture(GL_TEXTURE_2D, myTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D,
+					0, //No level of detail
+					GL_RGB, //FORMAT.. GL_RGB
+					texture_struct->width,
+					texture_struct->height,
+					0, //No border
+					GL_RGB,
+					GL_UNSIGNED_BYTE, //Whatever your numeric representation is
+					texture_struct->texture_pixels);
 
+	//-------------------------------------
 	program_id = simple_program();
 
 	glUseProgram(program_id);
 
 	position_slot = glGetAttribLocation(program_id, "Position");
 	color_slot = glGetAttribLocation(program_id, "SourceColor");
+	texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
 	glEnableVertexAttribArray(position_slot);
 	glEnableVertexAttribArray(color_slot);
+	glEnableVertexAttribArray(texture_slot);
+	
+	textureUniform = glGetUniformLocation(program_id, "Texture");
 
+	
+	
 	// Create Buffer
 	glGenBuffers(1, &vertex_buffer);
 
@@ -318,38 +360,49 @@ int main(int argc, char** argv) {
 	glGenBuffers(1, &index_buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
-
+	
 	// Repeat
 	while (!glfwWindowShouldClose(window)) {
+		glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT);
 
-	glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
+		glViewport(0, 0, texture_struct->width, texture_struct->height);
 
-	glViewport(0, 0, 640, 480);
+		glVertexAttribPointer(position_slot,
+							  3,
+							  GL_FLOAT,
+							  GL_FALSE,
+							  sizeof(Vertex),
+							  0);
 
-	glVertexAttribPointer(position_slot,
-						  3,
-						  GL_FLOAT,
-						  GL_FALSE,
-						  sizeof(Vertex),
-						  0);
+		glVertexAttribPointer(color_slot,
+							  4,
+							  GL_FLOAT,
+							  GL_FALSE,
+							  sizeof(Vertex),
+							  (GLvoid*) (sizeof(float) * 3));
+		glVertexAttribPointer(texture_slot,
+							  2,
+							  GL_FLOAT,
+							  GL_FALSE,
+							  sizeof(Vertex),
+							  (GLvoid*) (sizeof(float) * 7));
+							  
+							
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, myTexture);
+		glUniform1i(textureUniform, 0);
+		
+		glDrawElements(GL_TRIANGLES,
+					   sizeof(Indices) / sizeof(GLubyte),
+					   GL_UNSIGNED_BYTE, 0);
 
-	glVertexAttribPointer(color_slot,
-						  4,
-						  GL_FLOAT,
-						  GL_FALSE,
-						  sizeof(Vertex),
-						  (GLvoid*) (sizeof(float) * 3));
-
-	glDrawElements(GL_TRIANGLES,
-				   sizeof(Indices) / sizeof(GLubyte),
-				   GL_UNSIGNED_BYTE, 0);
-
-	glfwSwapBuffers(window);
-	glfwPollEvents();
+		glfwSwapBuffers(window);
+		glfwPollEvents();
 	}
-
+	//-------------------------------------
+	
 	glfwDestroyWindow(window);
 	glfwTerminate();
-	exit(EXIT_SUCCESS);*/
+	exit(EXIT_SUCCESS);
 }
