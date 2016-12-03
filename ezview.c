@@ -24,9 +24,9 @@ typedef struct{
 } Triple;
 
 const Vertex Vertices[] = {
-  {{1, -1, 0}, {1, 1, 1, 0}, {0, 0}},
+  {{-1, 1, 0}, {1, 1, 1, 0}, {0, 0}},
   {{1, 1, 0}, {1, 1, 1, 0}, {1, 0}},
-  {{-1, 1, 0}, {0, 0, 1, 0}, {1, 1}},
+  {{1, -1, 0}, {0, 0, 1, 0}, {1, 1}},
   {{-1, -1, 0}, {0, 0, 0, 0}, {0, 1}}
 };
 
@@ -113,6 +113,12 @@ int simple_program() {
 
 static void error_callback(int error, const char* description) {
   fputs(description, stderr);
+}
+
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
 // next_c() wraps the getc() function and provides error checking and line
@@ -287,12 +293,12 @@ int main(int argc, char** argv) {
 	GLuint index_buffer;
 	GLint textureUniform;
 
-	glfwSetErrorCallback(error_callback);
-
 	// Initialize GLFW library
 	if (!glfwInit())
 		return -1;
 
+	glfwSetErrorCallback(error_callback);
+	
 	glfwDefaultWindowHints();
 	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
@@ -312,6 +318,7 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 
+	glfwSetKeyCallback(window, key_callback);
 	glfwMakeContextCurrent(window);
 	
 	//Texture Setup -----------------------------
