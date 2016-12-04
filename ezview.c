@@ -4,12 +4,16 @@
 #include <GLES2/gl2.h>
 #include <GLFW/glfw3.h>
 
+#include "linmath.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 
 
 GLFWwindow* window;
-int line = 1;
+mat4x4 mvp;
+float angle = 0;
+int line = 1, width, height;
 
 typedef struct{
 	float position[3];
@@ -37,7 +41,8 @@ const GLubyte Indices[] = {
 };
 
 char* vertex_shader_src =
-  "attribute vec4 Position;\n"
+  "uniform mat4 MVP;\n"
+  "attribute vec3 Position;\n"
   "attribute vec4 SourceColor;\n"
   "attribute vec2 TexCoordIn;\n"
   "varying vec2 TexCoordOut;\n"
@@ -46,7 +51,7 @@ char* vertex_shader_src =
   "\n"
   "void main(void) {\n"
   "    DestinationColor = SourceColor;\n"
-  "    gl_Position = Position;\n"
+  "    gl_Position = MVP * vec4(Position, 1.0);\n"
   "    TexCoordOut = TexCoordIn;\n"
   "}\n";
 
@@ -110,6 +115,21 @@ int simple_program() {
   return program_id;
 }
 
+void rotate_matrix(float add_angle){
+	float ratio;
+	int width, height;
+	mat4x4 m, p;
+	
+	glfwGetFramebufferSize(window, &width, &height);
+	ratio = width / (float) height;
+	
+	mat4x4_identity(m);
+	
+	angle -= add_angle;
+	mat4x4_rotate_Z(m, m, angle);
+	mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+	mat4x4_mul(mvp, p, m);
+}
 
 static void error_callback(int error, const char* description) {
   fputs(description, stderr);
@@ -119,6 +139,14 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+	if(key == GLFW_KEY_Q && action == GLFW_PRESS)
+		rotate_matrix(25);
+	if(key == GLFW_KEY_W && action == GLFW_PRESS)
+		rotate_matrix(-25);
+	if(key == GLFW_KEY_Q && action == GLFW_REPEAT)
+		rotate_matrix(-.1);
+	if(key == GLFW_KEY_W && action == GLFW_REPEAT)
+		rotate_matrix(.1);
 }
 
 // next_c() wraps the getc() function and provides error checking and line
@@ -286,9 +314,10 @@ Triple* read_ppm_file(char* inputName){
 int main(int argc, char** argv) {
 	Triple* texture_struct;
 	int i, j;
+	int width, height;
 	texture_struct = read_ppm_file(argv[1]);
 
-	GLint program_id, position_slot, color_slot, texture_slot;
+	GLint program_id, position_slot, color_slot, texture_slot, mvp_slot;
 	GLuint vertex_buffer;
 	GLuint index_buffer;
 	GLint textureUniform;
@@ -306,8 +335,8 @@ int main(int argc, char** argv) {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
 	// Create and open a window
-	window = glfwCreateWindow(640,
-							480,
+	window = glfwCreateWindow(500,
+							500,
 							"Hello World",
 							NULL,
 							NULL);
@@ -344,6 +373,7 @@ int main(int argc, char** argv) {
 
 	glUseProgram(program_id);
 
+	mvp_slot = glGetUniformLocation(program_id, "MVP");
 	position_slot = glGetAttribLocation(program_id, "Position");
 	color_slot = glGetAttribLocation(program_id, "SourceColor");
 	texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
@@ -369,11 +399,14 @@ int main(int argc, char** argv) {
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
 	
 	// Repeat
+	glfwGetFramebufferSize(window, &width, &height);
+	glViewport(0, 0, width, height);
+	mat4x4_identity(mvp);
 	while (!glfwWindowShouldClose(window)) {
+		
 		glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		glViewport(0, 0, texture_struct->width, texture_struct->height);
 
 		glVertexAttribPointer(position_slot,
 							  3,
@@ -399,6 +432,9 @@ int main(int argc, char** argv) {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, myTexture);
 		glUniform1i(textureUniform, 0);
+		
+		glUniform1i(mvp_slot, 0);
+        glUniformMatrix4fv(mvp_slot, 1, GL_FALSE, (const GLfloat*) mvp);
 		
 		glDrawElements(GL_TRIANGLES,
 					   sizeof(Indices) / sizeof(GLubyte),
