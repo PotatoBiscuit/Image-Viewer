@@ -11,9 +11,9 @@
 
 
 GLFWwindow* window;
-mat4x4 mvp;
-float angle = 0;
-int line = 1, width, height;
+mat4x4 mvp, mvpt;
+float angle = 0, width, height;
+int line = 1;
 
 typedef struct{
 	float position[3];
@@ -42,28 +42,28 @@ const GLubyte Indices[] = {
 
 char* vertex_shader_src =
   "uniform mat4 MVP;\n"
+  "uniform mat4 MVPT;\n"
   "attribute vec3 Position;\n"
   "attribute vec4 SourceColor;\n"
   "attribute vec2 TexCoordIn;\n"
-  "varying vec2 TexCoordOut;\n"
+  "varying vec4 TexCoordOut;\n"
   "\n"
   "varying vec4 DestinationColor;\n"
   "\n"
   "void main(void) {\n"
   "    DestinationColor = SourceColor;\n"
   "    gl_Position = MVP * vec4(Position, 1.0);\n"
-  "    TexCoordOut = TexCoordIn;\n"
+  "    TexCoordOut = MVPT * vec4(TexCoordIn, 0.0, 1.0);\n"
   "}\n";
 
 char* fragment_shader_src =
   "varying lowp vec4 DestinationColor;\n"
-  "varying lowp vec2 TexCoordOut;\n"
+  "varying lowp vec4 TexCoordOut;\n"
   "uniform sampler2D Texture;\n"
   
   "\n"
   "void main(void) {\n"
-  "    //gl_FragColor = DestinationColor;\n"
-  "    gl_FragColor = texture2D(Texture, TexCoordOut);\n"
+  "    gl_FragColor = texture2DProj(Texture, TexCoordOut);\n"
   "}\n";
 
 
@@ -118,17 +118,36 @@ int simple_program() {
 void rotate_matrix(float add_angle){
 	float ratio;
 	int width, height;
-	mat4x4 m, p;
+	mat4x4 m, p, temp;
 	
 	glfwGetFramebufferSize(window, &width, &height);
 	ratio = width / (float) height;
 	
 	mat4x4_identity(m);
 	
+	mat4x4_rotate_Z(m, m, -angle);
+	mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+	mat4x4_mul(temp, p, m);
+	mat4x4_mul(mvp, temp, mvp);
+	
+	
+	mat4x4_identity(m);
+	
 	angle -= add_angle;
 	mat4x4_rotate_Z(m, m, angle);
 	mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-	mat4x4_mul(mvp, p, m);
+	mat4x4_mul(temp, p, m);
+	mat4x4_mul(mvp, temp, mvp);
+}
+
+void scale_matrix(float scale_index){
+	mat4x4 scale_matrix = {
+		{scale_index, 0.f, 0.f, 0.f},
+		{0.f,   scale_index,   0.f, 0.f},
+		{0.f,  0.f,   1.f, 0.f},
+		{0.f, 0.f, 0.f, 1.f}
+	};
+	mat4x4_mul(mvp, scale_matrix, mvp);
 }
 
 static void error_callback(int error, const char* description) {
@@ -139,6 +158,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+	
+	//Keypress for rotations
 	if(key == GLFW_KEY_Q && action == GLFW_PRESS)
 		rotate_matrix(25);
 	if(key == GLFW_KEY_W && action == GLFW_PRESS)
@@ -147,6 +168,16 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		rotate_matrix(-.1);
 	if(key == GLFW_KEY_W && action == GLFW_REPEAT)
 		rotate_matrix(.1);
+	
+	//Keypress for scaling
+	if(key == GLFW_KEY_A && action == GLFW_PRESS)
+		scale_matrix(1.1);
+	if(key == GLFW_KEY_S && action == GLFW_PRESS)
+		scale_matrix(.9);
+	if(key == GLFW_KEY_A && action == GLFW_REPEAT)
+		scale_matrix(1.03);
+	if(key == GLFW_KEY_S && action == GLFW_REPEAT)
+		scale_matrix(.97);
 }
 
 // next_c() wraps the getc() function and provides error checking and line
@@ -317,7 +348,7 @@ int main(int argc, char** argv) {
 	int width, height;
 	texture_struct = read_ppm_file(argv[1]);
 
-	GLint program_id, position_slot, color_slot, texture_slot, mvp_slot;
+	GLint program_id, position_slot, color_slot, texture_slot, mvp_slot, mvpt_slot;
 	GLuint vertex_buffer;
 	GLuint index_buffer;
 	GLint textureUniform;
@@ -354,8 +385,8 @@ int main(int argc, char** argv) {
 	GLuint myTexture;
 	glGenTextures(1, &myTexture);
 	glBindTexture(GL_TEXTURE_2D, myTexture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D,
@@ -374,6 +405,7 @@ int main(int argc, char** argv) {
 	glUseProgram(program_id);
 
 	mvp_slot = glGetUniformLocation(program_id, "MVP");
+	mvpt_slot = glGetUniformLocation(program_id, "MVPT");
 	position_slot = glGetAttribLocation(program_id, "Position");
 	color_slot = glGetAttribLocation(program_id, "SourceColor");
 	texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
@@ -400,8 +432,9 @@ int main(int argc, char** argv) {
 	
 	// Repeat
 	glfwGetFramebufferSize(window, &width, &height);
-	glViewport(0, 0, width, height);
+	glViewport(0, 0, width,  height);
 	mat4x4_identity(mvp);
+	mat4x4_identity(mvpt);
 	while (!glfwWindowShouldClose(window)) {
 		
 		glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
@@ -433,7 +466,7 @@ int main(int argc, char** argv) {
 		glBindTexture(GL_TEXTURE_2D, myTexture);
 		glUniform1i(textureUniform, 0);
 		
-		glUniform1i(mvp_slot, 0);
+		glUniformMatrix4fv(mvpt_slot, 1, GL_FALSE, (const GLfloat*) mvpt);
         glUniformMatrix4fv(mvp_slot, 1, GL_FALSE, (const GLfloat*) mvp);
 		
 		glDrawElements(GL_TRIANGLES,
