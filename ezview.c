@@ -380,6 +380,10 @@ Triple* read_p6_file(FILE* ppm){
 Triple* read_ppm_file(char* inputName){
 	Triple* texture_struct;
 	FILE* inputFile = fopen(inputName, "rb");
+	if(inputFile == NULL){
+		fprintf(stderr, "Error: File does not exist\n");
+		exit(1);
+	}
 	skip_comts_ws(inputFile);
 	expect_c(inputFile, 'P');
 	int c = next_c(inputFile);
