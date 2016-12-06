@@ -11,7 +11,7 @@
 
 
 GLFWwindow* window;
-mat4x4 mvp, mvpt;
+mat4x4 mvp;
 float angle = 0, width, height;
 int line = 1;
 
@@ -42,28 +42,27 @@ const GLubyte Indices[] = {
 
 char* vertex_shader_src =
   "uniform mat4 MVP;\n"
-  "uniform mat4 MVPT;\n"
   "attribute vec3 Position;\n"
   "attribute vec4 SourceColor;\n"
   "attribute vec2 TexCoordIn;\n"
-  "varying vec4 TexCoordOut;\n"
+  "varying vec2 TexCoordOut;\n"
   "\n"
   "varying vec4 DestinationColor;\n"
   "\n"
   "void main(void) {\n"
   "    DestinationColor = SourceColor;\n"
   "    gl_Position = MVP * vec4(Position, 1.0);\n"
-  "    TexCoordOut = MVPT * vec4(TexCoordIn, 0.0, 1.0);\n"
+  "    TexCoordOut = TexCoordIn;\n"
   "}\n";
 
 char* fragment_shader_src =
   "varying lowp vec4 DestinationColor;\n"
-  "varying lowp vec4 TexCoordOut;\n"
+  "varying lowp vec2 TexCoordOut;\n"
   "uniform sampler2D Texture;\n"
   
   "\n"
   "void main(void) {\n"
-  "    gl_FragColor = texture2DProj(Texture, TexCoordOut);\n"
+  "    gl_FragColor = texture2D(Texture, TexCoordOut);\n"
   "}\n";
 
 
@@ -147,7 +146,17 @@ void scale_matrix(float scale_index){
 		{0.f,  0.f,   1.f, 0.f},
 		{0.f, 0.f, 0.f, 1.f}
 	};
-	mat4x4_mul(mvp, scale_matrix, mvp);
+	mat4x4_mul(mvp, mvp, scale_matrix);
+}
+
+void translate_matrix(float x, float y){
+	mat4x4 translate_matrix = {
+		{1.f, 0.f, 0.f, 0.f},
+		{0.f, 1.f, 0.f, 0.f},
+		{0.f, 0.f, 1.f, 0.f},
+		{x, y, 0.f, 1.f}
+	};
+	mat4x4_mul(mvp, mvp, translate_matrix);
 }
 
 static void error_callback(int error, const char* description) {
@@ -171,13 +180,30 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 	
 	//Keypress for scaling
 	if(key == GLFW_KEY_A && action == GLFW_PRESS)
-		scale_matrix(1.1);
-	if(key == GLFW_KEY_S && action == GLFW_PRESS)
 		scale_matrix(.9);
+	if(key == GLFW_KEY_S && action == GLFW_PRESS)
+		scale_matrix(1.1);
 	if(key == GLFW_KEY_A && action == GLFW_REPEAT)
-		scale_matrix(1.03);
-	if(key == GLFW_KEY_S && action == GLFW_REPEAT)
 		scale_matrix(.97);
+	if(key == GLFW_KEY_S && action == GLFW_REPEAT)
+		scale_matrix(1.03);
+	
+	if(key == GLFW_KEY_UP && action == GLFW_PRESS)
+		translate_matrix(0, .1);
+	if(key == GLFW_KEY_DOWN && action == GLFW_PRESS)
+		translate_matrix(0, -.1);
+	if(key == GLFW_KEY_UP && action == GLFW_REPEAT)
+		translate_matrix(0, .04);
+	if(key == GLFW_KEY_DOWN && action == GLFW_REPEAT)
+		translate_matrix(0, -.04);
+	if(key == GLFW_KEY_LEFT && action == GLFW_PRESS)
+		translate_matrix(-.1,0);
+	if(key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
+		translate_matrix(.1, 0);
+	if(key == GLFW_KEY_LEFT && action == GLFW_REPEAT)
+		translate_matrix(-.04, 0);
+	if(key == GLFW_KEY_RIGHT && action == GLFW_REPEAT)
+		translate_matrix(.04, 0);
 }
 
 // next_c() wraps the getc() function and provides error checking and line
@@ -405,7 +431,6 @@ int main(int argc, char** argv) {
 	glUseProgram(program_id);
 
 	mvp_slot = glGetUniformLocation(program_id, "MVP");
-	mvpt_slot = glGetUniformLocation(program_id, "MVPT");
 	position_slot = glGetAttribLocation(program_id, "Position");
 	color_slot = glGetAttribLocation(program_id, "SourceColor");
 	texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
@@ -434,7 +459,6 @@ int main(int argc, char** argv) {
 	glfwGetFramebufferSize(window, &width, &height);
 	glViewport(0, 0, width,  height);
 	mat4x4_identity(mvp);
-	mat4x4_identity(mvpt);
 	while (!glfwWindowShouldClose(window)) {
 		
 		glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
@@ -466,7 +490,6 @@ int main(int argc, char** argv) {
 		glBindTexture(GL_TEXTURE_2D, myTexture);
 		glUniform1i(textureUniform, 0);
 		
-		glUniformMatrix4fv(mvpt_slot, 1, GL_FALSE, (const GLfloat*) mvpt);
         glUniformMatrix4fv(mvp_slot, 1, GL_FALSE, (const GLfloat*) mvp);
 		
 		glDrawElements(GL_TRIANGLES,
