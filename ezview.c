@@ -146,7 +146,7 @@ void scale_matrix(float scale_index){
 		{0.f,  0.f,   1.f, 0.f},
 		{0.f, 0.f, 0.f, 1.f}
 	};
-	mat4x4_mul(mvp, mvp, scale_matrix);
+	mat4x4_mul(mvp, scale_matrix, mvp);
 }
 
 void translate_matrix(float x, float y){
@@ -156,7 +156,17 @@ void translate_matrix(float x, float y){
 		{0.f, 0.f, 1.f, 0.f},
 		{x, y, 0.f, 1.f}
 	};
-	mat4x4_mul(mvp, mvp, translate_matrix);
+	mat4x4_mul(mvp, translate_matrix, mvp);
+}
+
+void shear_matrix(float change_xy, float change_yx){
+	mat4x4 shear_matrix = {
+		{1.f, change_yx, 0.f, 0.f},
+		{change_xy, 1.f, 0.f, 0.f},
+		{0.f, 0.f, 1.f, 0.f},
+		{0.f, 0.f, 0.f, 1.f}
+	};
+	mat4x4_mul(mvp, shear_matrix, mvp);
 }
 
 static void error_callback(int error, const char* description) {
@@ -204,6 +214,23 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		translate_matrix(-.04, 0);
 	if(key == GLFW_KEY_RIGHT && action == GLFW_REPEAT)
 		translate_matrix(.04, 0);
+	
+	if(key == GLFW_KEY_Z && action == GLFW_PRESS)
+		shear_matrix(-.1, 0);
+	if(key == GLFW_KEY_X && action == GLFW_PRESS)
+		shear_matrix(.1, 0);
+	if(key == GLFW_KEY_Z && action == GLFW_REPEAT)
+		shear_matrix(-.04, 0);
+	if(key == GLFW_KEY_X && action == GLFW_REPEAT)
+		shear_matrix(.04, 0);
+	if(key == GLFW_KEY_C && action == GLFW_PRESS)
+		shear_matrix(0, -.1);
+	if(key == GLFW_KEY_V && action == GLFW_PRESS)
+		shear_matrix(0, .1);
+	if(key == GLFW_KEY_C && action == GLFW_REPEAT)
+		shear_matrix(0, -.04);
+	if(key == GLFW_KEY_V && action == GLFW_REPEAT)
+		shear_matrix(0, .04);
 }
 
 // next_c() wraps the getc() function and provides error checking and line
