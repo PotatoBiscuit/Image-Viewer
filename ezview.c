@@ -146,7 +146,7 @@ void scale_matrix(float scale_index){
 		{0.f,  0.f,   1.f, 0.f},
 		{0.f, 0.f, 0.f, 1.f}
 	};
-	mat4x4_mul(mvp, scale_matrix, mvp);
+	mat4x4_mul(mvp, mvp, scale_matrix);
 }
 
 void translate_matrix(float x, float y){
@@ -166,7 +166,7 @@ void shear_matrix(float change_xy, float change_yx){
 		{0.f, 0.f, 1.f, 0.f},
 		{0.f, 0.f, 0.f, 1.f}
 	};
-	mat4x4_mul(mvp, shear_matrix, mvp);
+	mat4x4_mul(mvp, mvp, shear_matrix);
 }
 
 static void error_callback(int error, const char* description) {
