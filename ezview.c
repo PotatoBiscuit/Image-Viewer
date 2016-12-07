@@ -127,7 +127,7 @@ void rotate_matrix(float add_angle){
 	mat4x4_rotate_Z(m, m, -angle);
 	mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
 	mat4x4_mul(temp, p, m);
-	mat4x4_mul(mvp, temp, mvp);
+	mat4x4_mul(mvp, mvp, temp);
 	
 	
 	mat4x4_identity(m);
@@ -136,7 +136,7 @@ void rotate_matrix(float add_angle){
 	mat4x4_rotate_Z(m, m, angle);
 	mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
 	mat4x4_mul(temp, p, m);
-	mat4x4_mul(mvp, temp, mvp);
+	mat4x4_mul(mvp, mvp, temp);
 }
 
 void scale_matrix(float scale_index){
