@@ -462,9 +462,27 @@ int main(int argc, char** argv) {
 	glUseProgram(program_id);
 
 	mvp_slot = glGetUniformLocation(program_id, "MVP");
+	if(mvp_slot == -1){
+		fprintf(stderr, "Error: Could not find MVP matrix");
+		exit(1);
+	}
 	position_slot = glGetAttribLocation(program_id, "Position");
+	if(position_slot == -1){
+		fprintf(stderr, "Error: Could not find position vector");
+		exit(1);
+	}
 	color_slot = glGetAttribLocation(program_id, "SourceColor");
+	if(color_slot == -1){
+		fprintf(stderr, "Error: Could not find color vector");
+		exit(1);
+	}
 	texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
+	if(texture_slot == -1){
+		fprintf(stderr, "Error: Could not find texture coordinates");
+		exit(1);
+	}
+	
+	
 	glEnableVertexAttribArray(position_slot);
 	glEnableVertexAttribArray(color_slot);
 	glEnableVertexAttribArray(texture_slot);
