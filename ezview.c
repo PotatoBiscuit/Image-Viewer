@@ -125,29 +125,20 @@ int simple_program() {	//Create simple program for OpenGL to use
 }
 
 void rotate_matrix(float add_angle){	//Add rotation properties to our transformation matrix (mvp)
-	float ratio;
-	int width, height;
-	mat4x4 m, p, temp;
 	
-	glfwGetFramebufferSize(window, &width, &height);
-	ratio = width / (float) height;
+	mat4x4 m;
 	
 	//Undo previous rotation
 	mat4x4_identity(m);
-	
 	mat4x4_rotate_Z(m, m, -angle);
-	mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-	mat4x4_mul(temp, p, m);
-	mat4x4_mul(mvp, mvp, temp);	//Multiply tranformation matrix to rotation matrix to apply properties
+	mat4x4_mul(mvp, mvp, m);	//Multiply tranformation matrix to rotation matrix to apply properties
 	
 	//Perform new rotation with new calculated angle
 	mat4x4_identity(m);
 	
 	angle -= add_angle;
 	mat4x4_rotate_Z(m, m, angle);
-	mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-	mat4x4_mul(temp, p, m);
-	mat4x4_mul(mvp, mvp, temp);	//Multiply tranformation matrix to rotation matrix to apply properties
+	mat4x4_mul(mvp, mvp, m);	//Multiply tranformation matrix to rotation matrix to apply properties
 }
 
 void scale_matrix(float scale_index){	//Add scaling property to our tranformation matrix (mvp)
@@ -315,6 +306,87 @@ double next_number(FILE* json) {	//Parse the next number and return it as a doub
 	return value;
 }
 
+void set_window_hints(){	//Tell compiler how we should be using OpenGL
+	glfwDefaultWindowHints();
+	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2); //Maximum version is version 2
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);	//Minimum version is version 0
+}
+
+GLuint new_texture(Triple* texture_struct){	//Put our image into a texture
+	//Texture Setup -----------------------------
+	GLuint myTexture;
+	glGenTextures(1, &myTexture);	//Create new texture
+	glBindTexture(GL_TEXTURE_2D, myTexture);	//Bind texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);	//Set type of texture filter
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	//GL_LINEAR is used because pretty
+	glTexImage2D(GL_TEXTURE_2D,		//Add information to our texture
+					0, //No level of detail
+					GL_RGB, //FORMAT.. GL_RGB
+					texture_struct->width,
+					texture_struct->height,
+					0, //No border
+					GL_RGB,
+					GL_UNSIGNED_BYTE, //Whatever your numeric representation is
+					texture_struct->texture_pixels);	//Our pixel information
+
+	return myTexture;	//Return texture descriptor
+	//-------------------------------------
+}
+
+void bind_buffer(){	//Create new buffer, bind, and send it
+	GLuint vertex_buffer;
+	GLuint index_buffer;
+	// Create Buffer
+	glGenBuffers(1, &vertex_buffer);
+
+	// Map GL_ARRAY_BUFFER to this buffer
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+
+	// Send the data
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices), Vertices, GL_STATIC_DRAW);
+
+	glGenBuffers(1, &index_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
+}
+
+VariableArray* get_shader_variables(GLint program_id){	//Retrieve shader variable locations
+	VariableArray* our_variables = malloc(sizeof(VariableArray));
+	our_variables->mvp_slot = glGetUniformLocation(program_id, "MVP");
+	if(our_variables->mvp_slot == -1){	//If variable does not exist in shader, throw error
+		fprintf(stderr, "Error: Could not find MVP matrix");
+		exit(1);
+	}
+	our_variables->position_slot = glGetAttribLocation(program_id, "Position");
+	if(our_variables->position_slot == -1){
+		fprintf(stderr, "Error: Could not find position vector");
+		exit(1);
+	}
+	our_variables->color_slot = glGetAttribLocation(program_id, "SourceColor");
+	if(our_variables->color_slot == -1){
+		fprintf(stderr, "Error: Could not find color vector");
+		exit(1);
+	}
+	our_variables->texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
+	if(our_variables->texture_slot == -1){
+		fprintf(stderr, "Error: Could not find texture coordinates");
+		exit(1);
+	}
+	
+	glEnableVertexAttribArray(our_variables->position_slot);	//Enable attribute variables
+	glEnableVertexAttribArray(our_variables->color_slot);
+	glEnableVertexAttribArray(our_variables->texture_slot);
+	
+	our_variables->textureUniform = glGetUniformLocation(program_id, "Texture");
+	if(our_variables->textureUniform == -1){
+		fprintf(stderr, "Error: Could not find texture uniform");
+		exit(1);
+	}
+	return our_variables;	//Return struct of all variable locations
+}
+
 Triple* read_p3_file(FILE* ppm){	//Read p3 file and store in GLubyte array
 	double width, height, alpha;
 	Triple* texture_struct = malloc(sizeof(Triple));
@@ -412,90 +484,10 @@ Triple* read_ppm_file(char* inputName){	//Figure out type of file, and calle rea
 	return texture_struct;	//Return struct containing image information
 }
 
-void set_window_hints(){	//Tell compiler how we should be using OpenGL
-	glfwDefaultWindowHints();
-	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2); //Maximum version is version 2
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);	//Minimum version is version 0
-}
-
-GLuint new_texture(Triple* texture_struct){	//Put our image into a texture
-	//Texture Setup -----------------------------
-	GLuint myTexture;
-	glGenTextures(1, &myTexture);	//Create new texture
-	glBindTexture(GL_TEXTURE_2D, myTexture);	//Bind texture
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);	//Set type of texture filter
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	//GL_LINEAR is used because pretty
-	glTexImage2D(GL_TEXTURE_2D,		//Add information to our texture
-					0, //No level of detail
-					GL_RGB, //FORMAT.. GL_RGB
-					texture_struct->width,
-					texture_struct->height,
-					0, //No border
-					GL_RGB,
-					GL_UNSIGNED_BYTE, //Whatever your numeric representation is
-					texture_struct->texture_pixels);	//Our pixel information
-
-	return myTexture;	//Return texture descriptor
-	//-------------------------------------
-}
-
-void bind_buffer(){	//Create new buffer, bind, and send it
-	GLuint vertex_buffer;
-	GLuint index_buffer;
-	// Create Buffer
-	glGenBuffers(1, &vertex_buffer);
-
-	// Map GL_ARRAY_BUFFER to this buffer
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-
-	// Send the data
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices), Vertices, GL_STATIC_DRAW);
-
-	glGenBuffers(1, &index_buffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
-}
-
-VariableArray* get_shader_variables(GLint program_id){	//Retrieve shader variable locations
-	VariableArray* our_variables = malloc(sizeof(VariableArray));
-	our_variables->mvp_slot = glGetUniformLocation(program_id, "MVP");
-	if(our_variables->mvp_slot == -1){	//If variable does not exist in shader, throw error
-		fprintf(stderr, "Error: Could not find MVP matrix");
-		exit(1);
-	}
-	our_variables->position_slot = glGetAttribLocation(program_id, "Position");
-	if(our_variables->position_slot == -1){
-		fprintf(stderr, "Error: Could not find position vector");
-		exit(1);
-	}
-	our_variables->color_slot = glGetAttribLocation(program_id, "SourceColor");
-	if(our_variables->color_slot == -1){
-		fprintf(stderr, "Error: Could not find color vector");
-		exit(1);
-	}
-	our_variables->texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
-	if(our_variables->texture_slot == -1){
-		fprintf(stderr, "Error: Could not find texture coordinates");
-		exit(1);
-	}
-	
-	glEnableVertexAttribArray(our_variables->position_slot);	//Enable attribute variables
-	glEnableVertexAttribArray(our_variables->color_slot);
-	glEnableVertexAttribArray(our_variables->texture_slot);
-	
-	our_variables->textureUniform = glGetUniformLocation(program_id, "Texture");
-	if(our_variables->textureUniform == -1){
-		fprintf(stderr, "Error: Could not find texture uniform");
-		exit(1);
-	}
-	return our_variables;	//Return struct of all variable locations
-}
-
 int main(int argc, char** argv) {	//Execute our program
 	Triple* texture_struct;
 	VariableArray* our_variables;
+	mat4x4 p;
 	int i, j;
 	int width, height;
 	GLint program_id, mvp_slot, position_slot, color_slot, texture_slot, textureUniform;
@@ -511,8 +503,8 @@ int main(int argc, char** argv) {	//Execute our program
 	set_window_hints();	//Set OpenGL settings
 
 	// Create and open a window
-	window = glfwCreateWindow(500,
-							500,
+	window = glfwCreateWindow(5 * texture_struct->width,
+							5 * texture_struct->height,
 							"Hello World",
 							NULL,
 							NULL);
@@ -538,6 +530,30 @@ int main(int argc, char** argv) {	//Execute our program
 	bind_buffer();	//Create, bind, and send buffer
 	
 	mat4x4_identity(mvp);	//Create new transformation array, that starts as an identity matrix
+	
+	glVertexAttribPointer(our_variables->position_slot,	//Send position information to vertex shader
+							  3,
+							  GL_FLOAT,
+							  GL_FALSE,
+							  sizeof(Vertex),
+							  0);
+							  
+	glVertexAttribPointer(our_variables->color_slot,	//Send color information to vertex shader
+							  4,
+							  GL_FLOAT,
+							  GL_FALSE,
+							  sizeof(Vertex),
+							  (GLvoid*) (sizeof(float) * 3));
+	glVertexAttribPointer(our_variables->texture_slot,	//Send texture information to vertex shader
+							  2,
+							  GL_FLOAT,
+							  GL_FALSE,
+							  sizeof(Vertex),
+							  (GLvoid*) (sizeof(float) * 7));
+	
+	glActiveTexture(GL_TEXTURE0);	//Make texture active
+	glBindTexture(GL_TEXTURE_2D, myTexture);	//Bind texture to window
+	glUniform1i(our_variables->textureUniform, 0);	//Get ready to use texture information retrieved from fragment shader
 	while (!glfwWindowShouldClose(window)) {
 		
 		// Repeat
@@ -546,32 +562,11 @@ int main(int argc, char** argv) {	//Execute our program
 		
 		glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);	//Clear window color
 		glClear(GL_COLOR_BUFFER_BIT);
-
-		
-		glVertexAttribPointer(our_variables->position_slot,	//Send position information to vertex shader
-							  3,
-							  GL_FLOAT,
-							  GL_FALSE,
-							  sizeof(Vertex),
-							  0);
-							  
-		glVertexAttribPointer(our_variables->color_slot,	//Send color information to vertex shader
-							  4,
-							  GL_FLOAT,
-							  GL_FALSE,
-							  sizeof(Vertex),
-							  (GLvoid*) (sizeof(float) * 3));
-		glVertexAttribPointer(our_variables->texture_slot,	//Send texture information to vertex shader
-							  2,
-							  GL_FLOAT,
-							  GL_FALSE,
-							  sizeof(Vertex),
-							  (GLvoid*) (sizeof(float) * 7));
 							  					
-		glActiveTexture(GL_TEXTURE0);	//Make texture active
-		glBindTexture(GL_TEXTURE_2D, myTexture);	//Bind texture to window
-		glUniform1i(our_variables->textureUniform, 0);	//Get ready to use texture information retrieved from fragment shader
 		
+		//ratio = width / (float) height;
+		//mat4x4_ortho(p, ratio, -ratio, -1.f, 1.f, 1.f, -1.f);
+		//mat4x4_mul(mvp, p, mvp);
         glUniformMatrix4fv(our_variables->mvp_slot, 1, GL_FALSE, (const GLfloat*) mvp);	//Send transform. matrix to vertex shader
 		
 		glDrawElements(GL_TRIANGLES,	//Draw everything
