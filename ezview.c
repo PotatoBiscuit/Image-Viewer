@@ -412,11 +412,11 @@ Triple* read_p3_file(FILE* ppm){	//Read p3 file and store in GLubyte array
 	
 	for(i = 0; i < height; i++){	//Iterate through file and store pixel info into GLubyte array
 		for(j = 0; j < width; j++){
-			texture_pixels[(int)(j + height * i) * 3] = (int) next_number(ppm);
+			texture_pixels[(int)(j + width * i) * 3] = (int) next_number(ppm);
 			skip_ws(ppm);
-			texture_pixels[(int)(j + height * i) * 3 + 1] = (int) next_number(ppm);
+			texture_pixels[(int)(j + width * i) * 3 + 1] = (int) next_number(ppm);
 			skip_ws(ppm);
-			texture_pixels[(int)(j + height * i) * 3 + 2] = (int) next_number(ppm);
+			texture_pixels[(int)(j + width * i) * 3 + 2] = (int) next_number(ppm);
 			if(i == width - 1 && j == height - 1) continue;
 			skip_ws(ppm);
 		}
@@ -453,11 +453,12 @@ Triple* read_p6_file(FILE* ppm){	//Read p6 file and store in GLubyte array
 	
 	for(i = 0; i < height; i++){	//Iterate through file and store pixel info into GLubyte array
 		for(j = 0; j < width; j++){
-			texture_pixels[(int)(j + height * i) * 3] = next_c(ppm);
-			texture_pixels[(int)(j + height * i) * 3 + 1] = next_c(ppm);
-			texture_pixels[(int)(j + height * i) * 3 + 2] = next_c(ppm);
+			texture_pixels[(int)(j + width * i) * 3] = next_c(ppm);
+			texture_pixels[(int)(j + width * i) * 3 + 1] = next_c(ppm);
+			texture_pixels[(int)(j + width * i) * 3 + 2] = next_c(ppm);
 		}
 	}
+	
 	texture_struct->texture_pixels = texture_pixels;	//Store GLubyte array into struct
 	return texture_struct;	//return struct
 }
@@ -487,9 +488,8 @@ Triple* read_ppm_file(char* inputName){	//Figure out type of file, and calle rea
 int main(int argc, char** argv) {	//Execute our program
 	Triple* texture_struct;
 	VariableArray* our_variables;
-	mat4x4 p;
 	int i, j;
-	int width, height;
+	int width, height, new_width, new_height;
 	GLint program_id, mvp_slot, position_slot, color_slot, texture_slot, textureUniform;
 	GLuint myTexture;
 	texture_struct = read_ppm_file(argv[1]);	//Read and retrieve pixel information
@@ -502,9 +502,17 @@ int main(int argc, char** argv) {	//Execute our program
 	
 	set_window_hints();	//Set OpenGL settings
 
+	width = texture_struct->width;
+	height = texture_struct->height;
+	while(width < 1400 && height < 750){
+		width += texture_struct->width/2;
+		height += texture_struct->height/2;
+	}
+	width -= texture_struct->width/2;
+	height -= texture_struct->height/2;
 	// Create and open a window
-	window = glfwCreateWindow(5 * texture_struct->width,
-							5 * texture_struct->height,
+	window = glfwCreateWindow(width,
+							height,
 							"Hello World",
 							NULL,
 							NULL);
@@ -554,19 +562,14 @@ int main(int argc, char** argv) {	//Execute our program
 	glActiveTexture(GL_TEXTURE0);	//Make texture active
 	glBindTexture(GL_TEXTURE_2D, myTexture);	//Bind texture to window
 	glUniform1i(our_variables->textureUniform, 0);	//Get ready to use texture information retrieved from fragment shader
+	
+	glfwGetFramebufferSize(window, &width, &height);	//Get size of window
+	glViewport(0, 0, width,  height);	//Set Viewport size, and set it to size of window
 	while (!glfwWindowShouldClose(window)) {
-		
-		// Repeat
-		glfwGetFramebufferSize(window, &width, &height);	//Get size of window
-		glViewport(0, 0, width,  height);	//Set Viewport size, and set it to size of window
 		
 		glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);	//Clear window color
 		glClear(GL_COLOR_BUFFER_BIT);
 							  					
-		
-		//ratio = width / (float) height;
-		//mat4x4_ortho(p, ratio, -ratio, -1.f, 1.f, 1.f, -1.f);
-		//mat4x4_mul(mvp, p, mvp);
         glUniformMatrix4fv(our_variables->mvp_slot, 1, GL_FALSE, (const GLfloat*) mvp);	//Send transform. matrix to vertex shader
 		
 		glDrawElements(GL_TRIANGLES,	//Draw everything
