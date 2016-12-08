@@ -12,7 +12,7 @@
 
 GLFWwindow* window;
 mat4x4 mvp;
-float angle = 0, width, height;
+int width, height;
 int line = 1;
 
 typedef struct{		//This struct holds the coordinates for the object we will attach our texture to
@@ -127,18 +127,20 @@ int simple_program() {	//Create simple program for OpenGL to use
 void rotate_matrix(float add_angle){	//Add rotation properties to our transformation matrix (mvp)
 	
 	mat4x4 m;
+	float ratio = width/ (float) height;
+	mat4x4 rotate_matrix = 
+	{
+		{cosf(add_angle), -ratio * sinf(add_angle), 0, 0},
+		{1/ratio * sinf(add_angle), cosf(add_angle), 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1}
+	};
 	
-	//Undo previous rotation
 	mat4x4_identity(m);
-	mat4x4_rotate_Z(m, m, -angle);
-	mat4x4_mul(mvp, mvp, m);	//Multiply tranformation matrix to rotation matrix to apply properties
-	
-	//Perform new rotation with new calculated angle
-	mat4x4_identity(m);
-	
-	angle -= add_angle;
-	mat4x4_rotate_Z(m, m, angle);
-	mat4x4_mul(mvp, mvp, m);	//Multiply tranformation matrix to rotation matrix to apply properties
+	//Perform rotation
+	//mat4x4_rotate_Z(m, m, -add_angle);
+	//mat4x4_mul(m, ortho_matrix, m);
+	mat4x4_mul(mvp, mvp, rotate_matrix);	//Multiply tranformation matrix to rotation matrix to apply properties
 }
 
 void scale_matrix(float scale_index){	//Add scaling property to our tranformation matrix (mvp)
@@ -489,7 +491,6 @@ int main(int argc, char** argv) {	//Execute our program
 	Triple* texture_struct;
 	VariableArray* our_variables;
 	int i, j;
-	int width, height, new_width, new_height;
 	GLint program_id, mvp_slot, position_slot, color_slot, texture_slot, textureUniform;
 	GLuint myTexture;
 	texture_struct = read_ppm_file(argv[1]);	//Read and retrieve pixel information
