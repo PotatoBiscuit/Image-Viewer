@@ -126,7 +126,6 @@ int simple_program() {	//Create simple program for OpenGL to use
 
 void rotate_matrix(float add_angle){	//Add rotation properties to our transformation matrix (mvp)
 	
-	mat4x4 m;
 	float ratio = width/ (float) height;
 	mat4x4 rotate_matrix = 
 	{
@@ -136,10 +135,6 @@ void rotate_matrix(float add_angle){	//Add rotation properties to our transforma
 		{0, 0, 0, 1}
 	};
 	
-	mat4x4_identity(m);
-	//Perform rotation
-	//mat4x4_rotate_Z(m, m, -add_angle);
-	//mat4x4_mul(m, ortho_matrix, m);
 	mat4x4_mul(mvp, mvp, rotate_matrix);	//Multiply tranformation matrix to rotation matrix to apply properties
 }
 
@@ -154,6 +149,14 @@ void scale_matrix(float scale_index){	//Add scaling property to our tranformatio
 }
 
 void translate_matrix(float x, float y){	//Add translation property to our tranformation matrix (mvp)
+	float ratio;
+	if(width > height){
+		ratio = width/ (float) height;
+		x = x/ratio;
+	}else if(height > width){
+		ratio = height/ (float) width;
+		y = y/ratio;
+	}
 	mat4x4 translate_matrix = {	//Our translation matrix
 		{1.f, 0.f, 0.f, 0.f},
 		{0.f, 1.f, 0.f, 0.f},
@@ -165,6 +168,14 @@ void translate_matrix(float x, float y){	//Add translation property to our tranf
 }
 
 void shear_matrix(float change_xy, float change_yx){	//Add shear property to our transformation matrix (mvp)
+	float ratio;
+	if(width > height){
+		ratio = width/ (float) height;
+		change_xy = change_xy/ratio;
+	}else if(height > width){
+		ratio = height/ (float) width;
+		change_yx = change_yx/ratio;
+	}
 	mat4x4 shear_matrix = {	//Our shear matrix
 		{1.f, change_yx, 0.f, 0.f},
 		{change_xy, 1.f, 0.f, 0.f},
