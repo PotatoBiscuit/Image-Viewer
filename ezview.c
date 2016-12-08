@@ -27,6 +27,14 @@ typedef struct{
 	double height;
 } Triple;
 
+typedef struct{
+	GLint position_slot;
+	GLint color_slot;
+	GLint texture_slot;
+	GLint mvp_slot;
+	GLint textureUniform;
+} VariableArray;
+
 const Vertex Vertices[] = {
   {{-1, 1, 0}, {1, 1, 1, 0}, {0, 0}},
   {{1, 1, 0}, {1, 1, 1, 0}, {1, 0}},
@@ -399,45 +407,15 @@ Triple* read_ppm_file(char* inputName){
 	return texture_struct;
 }
 
-int main(int argc, char** argv) {
-	Triple* texture_struct;
-	int i, j;
-	int width, height;
-	texture_struct = read_ppm_file(argv[1]);
-
-	GLint program_id, position_slot, color_slot, texture_slot, mvp_slot, mvpt_slot;
-	GLuint vertex_buffer;
-	GLuint index_buffer;
-	GLint textureUniform;
-
-	// Initialize GLFW library
-	if (!glfwInit())
-		return -1;
-
-	glfwSetErrorCallback(error_callback);
-	
+void set_window_hints(){
 	glfwDefaultWindowHints();
 	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+}
 
-	// Create and open a window
-	window = glfwCreateWindow(500,
-							500,
-							"Hello World",
-							NULL,
-							NULL);
-
-	if (!window) {
-		glfwTerminate();
-		printf("glfwCreateWindow Error\n");
-		exit(1);
-	}
-
-	glfwSetKeyCallback(window, key_callback);
-	glfwMakeContextCurrent(window);
-	
+GLuint new_texture(Triple* texture_struct){
 	//Texture Setup -----------------------------
 	GLuint myTexture;
 	glGenTextures(1, &myTexture);
@@ -456,41 +434,13 @@ int main(int argc, char** argv) {
 					GL_UNSIGNED_BYTE, //Whatever your numeric representation is
 					texture_struct->texture_pixels);
 
+	return myTexture;
 	//-------------------------------------
-	program_id = simple_program();
+}
 
-	glUseProgram(program_id);
-
-	mvp_slot = glGetUniformLocation(program_id, "MVP");
-	if(mvp_slot == -1){
-		fprintf(stderr, "Error: Could not find MVP matrix");
-		exit(1);
-	}
-	position_slot = glGetAttribLocation(program_id, "Position");
-	if(position_slot == -1){
-		fprintf(stderr, "Error: Could not find position vector");
-		exit(1);
-	}
-	color_slot = glGetAttribLocation(program_id, "SourceColor");
-	if(color_slot == -1){
-		fprintf(stderr, "Error: Could not find color vector");
-		exit(1);
-	}
-	texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
-	if(texture_slot == -1){
-		fprintf(stderr, "Error: Could not find texture coordinates");
-		exit(1);
-	}
-	
-	
-	glEnableVertexAttribArray(position_slot);
-	glEnableVertexAttribArray(color_slot);
-	glEnableVertexAttribArray(texture_slot);
-	
-	textureUniform = glGetUniformLocation(program_id, "Texture");
-
-	
-	
+void bind_buffer(){
+	GLuint vertex_buffer;
+	GLuint index_buffer;
 	// Create Buffer
 	glGenBuffers(1, &vertex_buffer);
 
@@ -503,6 +453,87 @@ int main(int argc, char** argv) {
 	glGenBuffers(1, &index_buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
+}
+
+VariableArray* get_shader_variables(GLint program_id){
+	VariableArray* our_variables = malloc(sizeof(VariableArray));
+	our_variables->mvp_slot = glGetUniformLocation(program_id, "MVP");
+	if(our_variables->mvp_slot == -1){
+		fprintf(stderr, "Error: Could not find MVP matrix");
+		exit(1);
+	}
+	our_variables->position_slot = glGetAttribLocation(program_id, "Position");
+	if(our_variables->position_slot == -1){
+		fprintf(stderr, "Error: Could not find position vector");
+		exit(1);
+	}
+	our_variables->color_slot = glGetAttribLocation(program_id, "SourceColor");
+	if(our_variables->color_slot == -1){
+		fprintf(stderr, "Error: Could not find color vector");
+		exit(1);
+	}
+	our_variables->texture_slot = glGetAttribLocation(program_id, "TexCoordIn");
+	if(our_variables->texture_slot == -1){
+		fprintf(stderr, "Error: Could not find texture coordinates");
+		exit(1);
+	}
+	
+	glEnableVertexAttribArray(our_variables->position_slot);
+	glEnableVertexAttribArray(our_variables->color_slot);
+	glEnableVertexAttribArray(our_variables->texture_slot);
+	
+	our_variables->textureUniform = glGetUniformLocation(program_id, "Texture");
+	if(our_variables->textureUniform == -1){
+		fprintf(stderr, "Error: Could not find texture uniform");
+		exit(1);
+	}
+	return our_variables;
+}
+
+int main(int argc, char** argv) {
+	Triple* texture_struct;
+	VariableArray* our_variables;
+	int i, j;
+	int width, height;
+	GLint program_id, mvp_slot, position_slot, color_slot, texture_slot, textureUniform;
+	GLuint myTexture;
+	texture_struct = read_ppm_file(argv[1]);
+
+	// Initialize GLFW library
+	if (!glfwInit())
+		return -1;
+
+	glfwSetErrorCallback(error_callback);
+	
+	set_window_hints();
+
+	// Create and open a window
+	window = glfwCreateWindow(500,
+							500,
+							"Hello World",
+							NULL,
+							NULL);
+
+	if (!window) {
+		glfwTerminate();
+		printf("glfwCreateWindow Error\n");
+		exit(1);
+	}
+
+	glfwSetKeyCallback(window, key_callback);
+	glfwMakeContextCurrent(window);
+	
+	//Texture Setup -----------------------------
+	myTexture = new_texture(texture_struct);
+
+	//-------------------------------------
+	program_id = simple_program();
+
+	glUseProgram(program_id);
+	
+	our_variables = get_shader_variables(program_id);
+	
+	bind_buffer();
 	
 	// Repeat
 	glfwGetFramebufferSize(window, &width, &height);
@@ -513,33 +544,32 @@ int main(int argc, char** argv) {
 		glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-
-		glVertexAttribPointer(position_slot,
+		
+		glVertexAttribPointer(our_variables->position_slot,
 							  3,
 							  GL_FLOAT,
 							  GL_FALSE,
 							  sizeof(Vertex),
 							  0);
-
-		glVertexAttribPointer(color_slot,
+							  
+		glVertexAttribPointer(our_variables->color_slot,
 							  4,
 							  GL_FLOAT,
 							  GL_FALSE,
 							  sizeof(Vertex),
 							  (GLvoid*) (sizeof(float) * 3));
-		glVertexAttribPointer(texture_slot,
+		glVertexAttribPointer(our_variables->texture_slot,
 							  2,
 							  GL_FLOAT,
 							  GL_FALSE,
 							  sizeof(Vertex),
 							  (GLvoid*) (sizeof(float) * 7));
-							  
-							
+							  					
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, myTexture);
-		glUniform1i(textureUniform, 0);
+		glUniform1i(our_variables->textureUniform, 0);
 		
-        glUniformMatrix4fv(mvp_slot, 1, GL_FALSE, (const GLfloat*) mvp);
+        glUniformMatrix4fv(our_variables->mvp_slot, 1, GL_FALSE, (const GLfloat*) mvp);
 		
 		glDrawElements(GL_TRIANGLES,
 					   sizeof(Indices) / sizeof(GLubyte),
