@@ -18,3 +18,5 @@ Scale Down/Up: A/S
 Shear: Z/X/C/V
 
 Translate (Pan) Up/Left/Right/Down: Arrow Key Up/Arrow Key Left/Arrow Key Right/Arrow Key Down
+
+*Keys can be held down for continuous change
